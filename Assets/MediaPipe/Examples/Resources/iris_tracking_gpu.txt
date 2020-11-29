@@ -22,29 +22,6 @@ input_stream: "input_video"
 output_stream: "face_landmarks_with_iris"
 output_stream: "face_rect"
 output_stream: "face_detections"
-output_stream: "face_landmarks_with_iris_presence"
-output_stream: "face_detections_presence"
-
-# Throttles the images flowing downstream for flow control. It passes through
-# the very first incoming image unaltered, and waits for downstream nodes
-# (calculators and subgraphs) in the graph to finish their tasks before it
-# passes through another image. All images that come in while waiting are
-# dropped, limiting the number of in-flight images in most part of the graph to
-# 1. This prevents the downstream nodes from queuing up incoming images and data
-# excessively, which leads to increased latency and memory usage, unwanted in
-# real-time mobile applications. It also eliminates unnecessarily computation,
-# e.g., the output produced by a node may get dropped downstream if the
-# subsequent nodes are still busy processing previous inputs.
-node {
-  calculator: "FlowLimiterCalculator"
-  input_stream: "input_video"
-  input_stream: "FINISHED:face_landmarks_with_iris_presence"
-  input_stream_info: {
-    tag_index: "FINISHED"
-    back_edge: true
-  }
-  output_stream: "throttled_input_video"
-}
 
 # Defines how many faces to detect. Iris tracking currently only handles one
 # face (left and right eye), and therefore this should always be set to 1.
@@ -61,7 +38,7 @@ node {
 # Detects faces and corresponding landmarks.
 node {
   calculator: "FaceLandmarkFrontGpu"
-  input_stream: "IMAGE:throttled_input_video"
+  input_stream: "IMAGE:input_video"
   input_side_packet: "NUM_FACES:num_faces"
   output_stream: "LANDMARKS:multi_face_landmarks"
   output_stream: "ROIS_FROM_LANDMARKS:face_rects_from_landmarks"
@@ -127,7 +104,7 @@ node {
 # Detects iris landmarks, eye contour landmarks, and corresponding rect (ROI).
 node {
   calculator: "IrisLandmarkLeftAndRightGpu"
-  input_stream: "IMAGE:throttled_input_video"
+  input_stream: "IMAGE:input_video"
   input_stream: "LEFT_EYE_BOUNDARY_LANDMARKS:left_eye_boundary_landmarks"
   input_stream: "RIGHT_EYE_BOUNDARY_LANDMARKS:right_eye_boundary_landmarks"
   output_stream: "LEFT_EYE_CONTOUR_LANDMARKS:left_eye_contour_landmarks"
@@ -165,16 +142,4 @@ node {
   input_stream: "updated_face_landmarks"
   input_stream: "iris_landmarks"
   output_stream: "face_landmarks_with_iris"
-}
-
-node {
-  calculator: "PacketPresenceCalculator"
-  input_stream: "PACKET:face_landmarks_with_iris"
-  output_stream: "PRESENCE:face_landmarks_with_iris_presence"
-}
-
-node {
-  calculator: "PacketPresenceCalculator"
-  input_stream: "PACKET:face_detections"
-  output_stream: "PRESENCE:face_detections_presence"
 }
